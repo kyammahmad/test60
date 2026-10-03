@@ -35,7 +35,7 @@
     <style>
         :root {
             --glass-border: rgba(255, 255, 255, 0.2);
-            --glass-bg: rgba(15, 23, 42, 0.6);
+            --glass-bg: rgba(15, 23, 42, 0.7);
         }
         body {
             font-family: 'Cairo', sans-serif;
@@ -50,7 +50,7 @@
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         }
         .btn-primary {
             background: linear-gradient(135deg, #6366f1, #a855f7);
@@ -66,8 +66,6 @@
             background: linear-gradient(135deg, #ef4444, #b91c1c);
             box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
         }
-        
-        /* Background Animated Shapes */
         .bg-shape {
             position: fixed;
             border-radius: 50%;
@@ -78,29 +76,12 @@
         }
         .shape-1 { top: -10%; left: -10%; width: 300px; height: 300px; background: #6366f1; }
         .shape-2 { bottom: -10%; right: -10%; width: 400px; height: 400px; background: #ec4899; }
-        
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
         ::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
-        
-        /* Game specific */
-        .target-btn { position: absolute; transition: all 0.1s ease; }
-        
-        /* Mic Visualizer */
-        .mic-wave {
-            display: inline-block; width: 4px; height: 10px; background: #10b981; border-radius: 2px; margin: 0 1px;
-            animation: pulse-wave 1s infinite;
-        }
-        .mic-wave:nth-child(2) { animation-delay: 0.2s; }
-        .mic-wave:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes pulse-wave {
-            0%, 100% { height: 10px; }
-            50% { height: 20px; }
-        }
-        
-        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 10px;}
-        .toast { background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; animation: fadeUp 0.3s forwards; }
+        .target-btn { position: absolute; transition: all 0.1s ease; cursor: pointer; }
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px; align-items: center; pointer-events: none; }
+        .toast { background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 12px 24px; border-radius: 16px; font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: fadeUp 0.3s forwards; text-align: center; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
@@ -109,61 +90,36 @@
     <div class="bg-shape shape-1"></div>
     <div class="bg-shape shape-2"></div>
 
-    <!-- Main Application Container -->
-    <div id="app" class="w-full max-w-md w-full glass-panel rounded-3xl overflow-hidden relative min-h-[600px] flex flex-col">
-        <!-- Dynamic Content Injected Here -->
+    <div id="app" class="w-full max-w-md glass-panel rounded-3xl overflow-hidden relative min-h-[600px] flex flex-col">
+        <!-- Dynamic Content -->
     </div>
     
     <div id="toast-container"></div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, collection, increment, arrayUnion, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Environment globals
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : '60-seconds-app-v1';
-        const FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            // Mock config to prevent crashes if run locally without canvas wrapper
-            projectId: "mock-project", apiKey: "mock-key"
-        };
-        const AUTH_TOKEN = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let app, db, auth;
-        try {
-            app = initializeApp(FIREBASE_CONFIG);
-            db = getFirestore(app);
-            auth = getAuth(app);
-        } catch (e) {
-            console.error("Firebase init failed", e);
-        }
-
-        // Available Avatars
+    <script>
+        // Data & State Management (Offline-First Robust Simulator)
         const AVATARS = ['🦊', '🐯', '🐰', '🐸', '🐼', '🤖', '👻', '👽', '👾', '🤡'];
         const MINIGAMES = [
             { id: 'speed_tap', name: 'النقرات السريعة', desc: 'اضغط على الهدف بأسرع ما يمكن!' },
             { id: 'quick_math', name: 'الرياضيات السريعة', desc: 'حل المسائل أسرع من خصمك!' },
-            { id: 'color_match', name: 'تطابق الألوان', desc: 'اختر اللون المكتوب وليس لون النص!' }
+            { id: 'color_match', name: 'تطابق الألوان', desc: 'اختر اللون المكتوب وليس لون الخط!' }
         ];
 
         const State = {
             view: 'loading', // loading, login, menu, shop, lobby, game, results, ads
             user: null, // { uid, name, avatar, coins, xp, level }
             roomId: null,
-            room: null, // syncs from firestore
-            unsubscribeRoom: null,
-            audioEnabled: true,
+            room: null,
             myMicOn: false,
+            gameInterval: null,
             gameLocalState: {
-                timer: null,
-                timeLeft: 0,
-                targetPos: { x: 50, y: 50 } // for speed tap
+                timeLeft: 60,
+                targetPos: { x: 50, y: 50 }
             }
         };
 
-        // Core Render Engine
         const AppContainer = document.getElementById('app');
-        
+
         function render() {
             let html = '';
             switch(State.view) {
@@ -178,6 +134,7 @@
                 default: html = renderLoading();
             }
             AppContainer.innerHTML = html;
+            attachEventListeners();
         }
 
         function renderLoading() {
@@ -185,7 +142,7 @@
                 <div class="flex-1 flex flex-col items-center justify-center p-8 text-center animate-pulse">
                     <div class="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
                     <h2 class="text-2xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">60 ثانية</h2>
-                    <p class="text-gray-400">جاري الاتصال بالخوادم...</p>
+                    <p class="text-gray-400">جاري إعداد اللعبة..</p>
                 </div>
             `;
         }
@@ -199,7 +156,7 @@
                     <div class="w-full glass-panel p-6 rounded-2xl flex flex-col gap-4">
                         <div>
                             <label class="block text-sm text-gray-300 mb-2">اختر صورتك الرمزية</label>
-                            <div class="flex overflow-x-auto gap-2 pb-2 hide-scrollbar">
+                            <div class="flex overflow-x-auto gap-2 pb-2">
                                 ${AVATARS.map((emoji, i) => `
                                     <button data-action="select-avatar" data-val="${emoji}" class="avatar-btn text-3xl p-2 rounded-xl border-2 ${i === 0 ? 'border-primary bg-primary/20' : 'border-transparent bg-white/5'} transition-all flex-shrink-0">${emoji}</button>
                                 `).join('')}
@@ -207,9 +164,9 @@
                         </div>
                         <div>
                             <label class="block text-sm text-gray-300 mb-2">اسم اللاعب</label>
-                            <input type="text" id="username-input" class="w-full bg-black/50 border border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition" placeholder="أدخل اسمك هنا..." maxlength="12">
+                            <input type="text" id="username-input" class="w-full bg-black/50 border border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition" placeholder="أدخل اسمك هنا..." maxlength="12" value="لاعب ${Math.floor(Math.random()*900+100)}">
                         </div>
-                        <button data-action="create-profile" class="btn-primary w-full py-3 rounded-xl font-bold text-lg mt-2">دخول اللعبة</button>
+                        <button data-action="create-profile" class="btn-primary w-full py-3 rounded-xl font-bold text-lg mt-2 cursor-pointer">دخول اللعبة</button>
                     </div>
                 </div>
             `;
@@ -218,7 +175,6 @@
         function renderMenu() {
             return `
                 <div class="flex-1 flex flex-col p-6 relative">
-                    <!-- Header Profile -->
                     <div class="glass-panel p-4 rounded-2xl flex justify-between items-center mb-6">
                         <div class="flex items-center gap-3">
                             <div class="text-4xl bg-white/10 p-2 rounded-full border border-white/20">${State.user.avatar}</div>
@@ -231,13 +187,12 @@
                             <div class="flex items-center gap-1 bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-full text-sm font-bold border border-yellow-500/30">
                                 <span>${State.user.coins}</span> 🪙
                             </div>
-                            <button data-action="go-shop" class="text-xs text-gray-300 hover:text-white underline">المتجر 🛒</button>
+                            <button data-action="go-shop" class="text-xs text-gray-300 hover:text-white underline cursor-pointer">المتجر 🛒</button>
                         </div>
                     </div>
 
-                    <!-- Main Actions -->
                     <div class="flex-1 flex flex-col justify-center gap-4">
-                        <button data-action="create-room" class="btn-primary p-6 rounded-2xl flex flex-col items-center justify-center gap-2 group">
+                        <button data-action="create-room" class="btn-primary p-6 rounded-2xl flex flex-col items-center justify-center gap-2 group cursor-pointer">
                             <span class="text-3xl group-hover:scale-110 transition">🎮</span>
                             <span class="font-bold text-xl">إنشاء غرفة</span>
                             <span class="text-xs text-gray-200">العب مع أصدقائك (2-8 لاعبين)</span>
@@ -246,18 +201,17 @@
                         <div class="glass-panel p-6 rounded-2xl flex flex-col items-center justify-center gap-3">
                             <h4 class="font-bold text-lg mb-1">الانضمام لغرفة</h4>
                             <div class="flex w-full gap-2">
-                                <input type="text" id="room-code-input" class="flex-1 bg-black/50 border border-gray-600 rounded-xl px-4 py-2 text-white text-center font-bold tracking-widest uppercase focus:outline-none focus:border-primary transition" placeholder="رمز الغرفة" maxlength="5">
-                                <button data-action="join-room" class="btn-success px-6 rounded-xl font-bold">دخول</button>
+                                <input type="text" id="room-code-input" class="flex-1 bg-black/50 border border-gray-600 rounded-xl px-4 py-2 text-white text-center font-bold tracking-widest uppercase focus:outline-none focus:border-primary transition" placeholder="رمز الغرفة (مثال: A7K29)" maxlength="5">
+                                <button data-action="join-room" class="btn-success px-6 rounded-xl font-bold cursor-pointer">دخول</button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Footer / Monetization -->
                     <div class="mt-6 flex gap-2">
-                        <button data-action="go-ads" class="flex-1 glass-panel py-3 rounded-xl flex justify-center items-center gap-2 hover:bg-white/10 transition text-sm font-bold">
+                        <button data-action="go-ads" class="flex-1 glass-panel py-3 rounded-xl flex justify-center items-center gap-2 hover:bg-white/10 transition text-sm font-bold cursor-pointer">
                             📺 مكافآت مجانية
                         </button>
-                        <button data-action="buy-vip" class="flex-1 glass-panel py-3 rounded-xl flex justify-center items-center gap-2 hover:bg-white/10 transition text-sm font-bold border-yellow-500/50 text-yellow-400">
+                        <button data-action="buy-vip" class="flex-1 glass-panel py-3 rounded-xl flex justify-center items-center gap-2 hover:bg-white/10 transition text-sm font-bold border-yellow-500/50 text-yellow-400 cursor-pointer">
                             👑 إزالة الإعلانات
                         </button>
                     </div>
@@ -270,17 +224,17 @@
                 <div class="flex-1 flex flex-col p-6">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold">المتجر 🛒</h2>
-                        <button data-action="go-menu" class="bg-white/10 px-4 py-2 rounded-xl text-sm hover:bg-white/20 transition">عودة</button>
+                        <button data-action="go-menu" class="bg-white/10 px-4 py-2 rounded-xl text-sm hover:bg-white/20 transition cursor-pointer">عودة</button>
                     </div>
                     <div class="bg-yellow-500/20 text-yellow-400 p-4 rounded-xl text-center font-bold mb-6 border border-yellow-500/30">
                         رصيدك: ${State.user.coins} 🪙
                     </div>
-                    <p class="text-center text-gray-400 mb-4">قريباً.. شراء إطارات وصور حصرية!</p>
+                    <p class="text-center text-gray-400 mb-4">احصل على صور رمزية جديدة ومميزة!</p>
                     <div class="grid grid-cols-3 gap-3">
-                        ${AVATARS.slice(5).map((a, i) => `
-                            <div class="glass-panel flex flex-col items-center justify-center p-4 rounded-xl gap-2">
+                        ${AVATARS.map((a, i) => `
+                            <div class="glass-panel flex flex-col items-center justify-center p-4 rounded-xl gap-2 cursor-pointer hover:bg-white/10" data-action="buy-avatar" data-val="${a}">
                                 <span class="text-4xl">${a}</span>
-                                <span class="text-xs bg-black/50 px-2 py-1 rounded-full">${100 + i*50} 🪙</span>
+                                <span class="text-xs bg-black/50 px-2 py-1 rounded-full">${i < 5 ? 'مجاني' : '50 🪙'}</span>
                             </div>
                         `).join('')}
                     </div>
@@ -293,12 +247,12 @@
                 <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
                     <div class="text-6xl mb-4">📺</div>
                     <h2 class="text-2xl font-bold mb-2">شاهد إعلان واحصل على عملات!</h2>
-                    <p class="text-gray-300 mb-8">احصل على 50 🪙 لشراء صور رمزية حصرية.</p>
+                    <p class="text-gray-300 mb-8">احصل على 50 🪙 فورية لرصيدك.</p>
                     
-                    <button data-action="watch-ad" id="btn-watch-ad" class="btn-primary w-full py-4 rounded-xl font-bold text-lg mb-4">
+                    <button data-action="watch-ad" class="btn-primary w-full py-4 rounded-xl font-bold text-lg mb-4 cursor-pointer">
                         مشاهدة الإعلان الآن
                     </button>
-                    <button data-action="go-menu" class="w-full bg-white/10 py-3 rounded-xl hover:bg-white/20 transition">عودة</button>
+                    <button data-action="go-menu" class="w-full bg-white/10 py-3 rounded-xl hover:bg-white/20 transition cursor-pointer">عودة</button>
                 </div>
             `;
         }
@@ -306,8 +260,8 @@
         function renderLobby() {
             if(!State.room) return renderLoading();
             const isHost = State.room.host === State.user.uid;
-            const players = Object.values(State.room.players || {}).filter(Boolean);
-            const allReady = players.every(p => p.isReady) && players.length >= 1; // Allows 1 for testing, usually >= 2
+            const players = Object.values(State.room.players || {});
+            const allReady = players.every(p => p.isReady);
 
             let playerListHTML = players.map(p => `
                 <div class="glass-panel p-3 rounded-xl flex items-center justify-between ${p.uid === State.user.uid ? 'border-primary' : ''}">
@@ -318,7 +272,7 @@
                         </div>
                         <span class="font-bold ${p.uid === State.room.host ? 'text-yellow-400' : 'text-white'}">${p.name} ${p.uid === State.room.host ? '👑' : ''}</span>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div>
                         ${p.isReady ? '<span class="text-green-400 text-sm font-bold bg-green-400/10 px-2 py-1 rounded">جاهز</span>' : '<span class="text-gray-400 text-sm bg-black/50 px-2 py-1 rounded">ينتظر</span>'}
                     </div>
                 </div>
@@ -330,41 +284,37 @@
 
             return `
                 <div class="flex-1 flex flex-col p-4 h-full">
-                    <!-- Header -->
                     <div class="flex justify-between items-center mb-4 glass-panel p-3 rounded-xl">
                         <div>
-                            <span class="text-xs text-gray-400 block">رمز الغرفة</span>
+                            <span class="text-xs text-gray-400 block">رمز الغرفة (شاركها مع أصدقائك)</span>
                             <span class="font-black text-xl tracking-widest text-secondary">${State.roomId}</span>
                         </div>
                         <div class="flex gap-2">
-                            <button data-action="toggle-mic" class="bg-white/10 p-2 rounded-lg text-xl hover:bg-white/20 transition ${State.myMicOn ? 'text-green-400' : 'text-gray-400'}">
+                            <button data-action="toggle-mic" class="bg-white/10 p-2 rounded-lg text-xl hover:bg-white/20 transition cursor-pointer ${State.myMicOn ? 'text-green-400' : 'text-gray-400'}">
                                 ${State.myMicOn ? '🎤' : '🔇'}
                             </button>
-                            <button data-action="leave-room" class="bg-red-500/20 text-red-400 p-2 rounded-lg text-sm hover:bg-red-500/40 transition">مغادرة</button>
+                            <button data-action="leave-room" class="bg-red-500/20 text-red-400 p-2 rounded-lg text-sm hover:bg-red-500/40 transition cursor-pointer">مغادرة</button>
                         </div>
                     </div>
 
-                    <!-- Players Grid -->
-                    <div class="flex-1 overflow-y-auto pr-1 mb-4 flex flex-col gap-2 hide-scrollbar">
+                    <div class="flex-1 overflow-y-auto pr-1 mb-4 flex flex-col gap-2">
                         <h3 class="text-sm text-gray-400 mb-1">اللاعبين (${players.length}/8)</h3>
                         ${playerListHTML}
                     </div>
 
-                    <!-- Chat Box -->
-                    <div class="glass-panel rounded-xl flex flex-col h-40 mb-4 overflow-hidden border-t border-white/10">
+                    <div class="glass-panel rounded-xl flex flex-col h-36 mb-4 overflow-hidden border-t border-white/10">
                         <div class="flex-1 overflow-y-auto p-3 flex flex-col justify-end text-right" id="chat-messages">
-                            ${chatHTML || '<div class="text-center text-gray-500 text-sm my-auto">لا توجد رسائل...</div>'}
+                            ${chatHTML || '<div class="text-center text-gray-500 text-sm my-auto">مرحباً بك في الدردشة!</div>'}
                         </div>
                         <div class="flex border-t border-white/10 p-2 gap-2 bg-black/30">
-                            <input type="text" id="chat-input" class="flex-1 bg-transparent text-sm focus:outline-none px-2" placeholder="اكتب رسالة...">
-                            <button data-action="send-chat" class="text-primary p-1">إرسال</button>
+                            <input type="text" id="chat-input" class="flex-1 bg-transparent text-sm focus:outline-none px-2" placeholder="اكتب رسالة..">
+                            <button data-action="send-chat" class="text-primary p-1 cursor-pointer font-bold">إرسال</button>
                         </div>
                     </div>
 
-                    <!-- Action Button -->
                     ${isHost 
-                        ? `<button data-action="start-game" class="${allReady ? 'btn-primary' : 'bg-gray-600 cursor-not-allowed'} w-full py-4 rounded-xl font-bold text-lg shadow-lg" ${!allReady ? 'disabled' : ''}>${allReady ? 'بدء اللعبة' : 'بانتظار جاهزية الجميع'}</button>` 
-                        : `<button data-action="toggle-ready" class="${State.room.players[State.user.uid]?.isReady ? 'bg-gray-600' : 'btn-success'} w-full py-4 rounded-xl font-bold text-lg shadow-lg">${State.room.players[State.user.uid]?.isReady ? 'إلغاء الجاهزية' : 'أنا جاهز!'}</button>`
+                        ? `<button data-action="start-game" class="${allReady ? 'btn-primary' : 'bg-gray-600 cursor-not-allowed'} w-full py-4 rounded-xl font-bold text-lg shadow-lg cursor-pointer">${allReady ? 'بدء اللعبة' : 'بانتظار جاهزية الجميع'}</button>` 
+                        : `<button data-action="toggle-ready" class="${State.room.players[State.user.uid]?.isReady ? 'bg-gray-600' : 'btn-success'} w-full py-4 rounded-xl font-bold text-lg shadow-lg cursor-pointer">${State.room.players[State.user.uid]?.isReady ? 'إلغاء الجاهزية' : 'أنا جاهز!'}</button>`
                     }
                 </div>
             `;
@@ -375,20 +325,17 @@
             const gd = State.room.gameData;
             const myScore = State.room.players[State.user.uid]?.score || 0;
             
-            // Render Countdown phase
             if (State.room.status === 'countdown') {
                 return `
                     <div class="flex-1 flex flex-col items-center justify-center bg-black/80 z-50 absolute inset-0 rounded-3xl">
                         <h2 class="text-2xl mb-4 text-primary font-bold animate-pulse">تجهّز!</h2>
-                        <div class="text-8xl font-black text-white" id="countdown-text">3</div>
+                        <div class="text-8xl font-black text-white" id="countdown-num">3</div>
                         <p class="mt-8 text-xl text-gray-300">${MINIGAMES.find(m => m.id === gd.type)?.name || ''}</p>
                     </div>
                 `;
             }
 
-            // Game UI
             let gameAreaHTML = '';
-            
             if (gd.type === 'speed_tap') {
                 gameAreaHTML = `
                     <div class="flex-1 relative w-full border-2 border-white/10 rounded-xl overflow-hidden bg-black/30" id="tap-area">
@@ -399,58 +346,50 @@
                 `;
             } else if (gd.type === 'quick_math') {
                 const currentQ = gd.questions?.[gd.currentQIndex];
-                if(currentQ) {
-                    gameAreaHTML = `
-                        <div class="flex-1 flex flex-col items-center justify-center w-full">
-                            <div class="text-5xl font-black mb-8 font-mono bg-white/10 py-6 px-12 rounded-2xl border border-white/20 shadow-xl tracking-widest" dir="ltr">
-                                ${currentQ.q} = ?
-                            </div>
-                            <div class="grid grid-cols-2 gap-4 w-full px-8">
-                                ${currentQ.options.map(opt => `
-                                    <button data-action="answer-math" data-val="${opt}" class="glass-panel py-6 rounded-xl text-3xl font-bold hover:bg-white/20 active:scale-95 transition border border-white/10 shadow-lg">${opt}</button>
-                                `).join('')}
-                            </div>
+                gameAreaHTML = `
+                    <div class="flex-1 flex flex-col items-center justify-center w-full">
+                        <div class="text-5xl font-black mb-8 font-mono bg-white/10 py-6 px-12 rounded-2xl border border-white/20 shadow-xl tracking-widest" dir="ltr">
+                            ${currentQ.q} = ?
                         </div>
-                    `;
-                } else {
-                    gameAreaHTML = `<div class="flex-1 flex items-center justify-center">انتهت الأسئلة!</div>`;
-                }
+                        <div class="grid grid-cols-2 gap-4 w-full px-8">
+                            ${currentQ.options.map(opt => `
+                                <button data-action="answer-math" data-val="${opt}" class="glass-panel py-6 rounded-xl text-3xl font-bold hover:bg-white/20 active:scale-95 transition border border-white/10 shadow-lg cursor-pointer">${opt}</button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
             } else if (gd.type === 'color_match') {
                 const currentQ = gd.questions?.[gd.currentQIndex];
-                if(currentQ) {
-                    const colorMap = { 'red': 'أحمر', 'blue': 'أزرق', 'green': 'أخضر', 'yellow': 'أصفر' };
-                    const hexMap = { 'red': '#ef4444', 'blue': '#3b82f6', 'green': '#10b981', 'yellow': '#eab308' };
-                    
-                    gameAreaHTML = `
-                        <div class="flex-1 flex flex-col items-center justify-center w-full">
-                            <p class="text-sm text-gray-300 mb-2">اختر اللون الذي تقرأه، وليس لون الخط!</p>
-                            <div class="text-6xl font-black mb-10" style="color: ${hexMap[currentQ.visualColor]}">
-                                ${colorMap[currentQ.wordColor]}
-                            </div>
-                            <div class="grid grid-cols-2 gap-4 w-full px-8">
-                                ${currentQ.options.map(optHex => `
-                                    <button data-action="answer-color" data-val="${optHex}" class="w-full h-24 rounded-xl active:scale-95 transition shadow-lg border-2 border-white/20" style="background-color: ${hexMap[optHex]}"></button>
-                                `).join('')}
-                            </div>
+                const colorMap = { 'red': 'أحمر', 'blue': 'أزرق', 'green': 'أخضر', 'yellow': 'أصفر' };
+                const hexMap = { 'red': '#ef4444', 'blue': '#3b82f6', 'green': '#10b981', 'yellow': '#eab308' };
+                
+                gameAreaHTML = `
+                    <div class="flex-1 flex flex-col items-center justify-center w-full">
+                        <p class="text-sm text-gray-300 mb-2">اختر اللون الذي تقرأه كتابةً وليس لون الخط!</p>
+                        <div class="text-6xl font-black mb-10" style="color: ${hexMap[currentQ.visualColor]}">
+                            ${colorMap[currentQ.wordColor]}
                         </div>
-                    `;
-                }
+                        <div class="grid grid-cols-2 gap-4 w-full px-8">
+                            ${currentQ.options.map(optHex => `
+                                <button data-action="answer-color" data-val="${optHex}" class="w-full h-24 rounded-xl active:scale-95 transition shadow-lg border-2 border-white/20 cursor-pointer" style="background-color: ${hexMap[optHex]}"></button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
             }
 
             return `
                 <div class="flex-1 flex flex-col p-4 h-full">
-                    <!-- Top Bar -->
                     <div class="flex justify-between items-center mb-4 glass-panel px-4 py-3 rounded-2xl">
                         <div class="flex flex-col items-center">
                             <span class="text-xs text-gray-400">الوقت</span>
-                            <span class="font-black text-2xl text-secondary timer-display font-mono">--</span>
+                            <span class="font-black text-2xl text-secondary font-mono">${State.gameLocalState.timeLeft}s</span>
                         </div>
                         <div class="flex flex-col items-center">
                             <span class="text-xs text-gray-400">نقاطي</span>
                             <span class="font-black text-2xl text-primary font-mono">${myScore}</span>
                         </div>
                     </div>
-
                     ${gameAreaHTML}
                 </div>
             `;
@@ -458,57 +397,35 @@
 
         function renderResults() {
             if(!State.room) return renderLoading();
-            const players = Object.values(State.room.players || {}).filter(Boolean).sort((a,b) => (b.score || 0) - (a.score || 0));
+            const players = Object.values(State.room.players || {}).sort((a,b) => (b.score || 0) - (a.score || 0));
             const winner = players[0];
             const amIWinner = winner?.uid === State.user.uid;
 
             return `
-                <div class="flex-1 flex flex-col p-6 items-center text-center">
-                    <h2 class="text-3xl font-black mb-6 mt-4 ${amIWinner ? 'text-yellow-400' : 'text-white'}">
-                        ${amIWinner ? '🎉 لقد فزت! 🎉' : 'انتهت اللعبة!'}
+                <div class="flex-1 flex flex-col p-6 items-center text-center justify-center">
+                    <h2 class="text-3xl font-black mb-6 ${amIWinner ? 'text-yellow-400' : 'text-white'}">
+                        ${amIWinner ? '🎉 لقد فزت بالمركز الأول! 🎉' : 'انتهت اللعبة!'}
                     </h2>
-
-                    <!-- Podium -->
-                    <div class="flex items-end justify-center gap-2 mb-8 h-40">
-                        ${players[1] ? `
-                            <div class="flex flex-col items-center animate-fadeUp" style="animation-delay: 0.2s">
-                                <span class="text-3xl mb-2">${players[1].avatar}</span>
-                                <div class="w-16 bg-gray-400 h-20 rounded-t-lg flex items-start justify-center pt-2 font-bold">${players[1].score}</div>
-                            </div>
-                        ` : ''}
-                        
-                        <div class="flex flex-col items-center animate-fadeUp z-10 shadow-2xl">
-                            <span class="text-5xl mb-2">${winner?.avatar || '👤'}</span>
-                            <div class="w-20 bg-yellow-500 h-28 rounded-t-lg flex items-start justify-center pt-2 font-black text-black">${winner?.score || 0}</div>
-                        </div>
-
-                        ${players[2] ? `
-                            <div class="flex flex-col items-center animate-fadeUp" style="animation-delay: 0.4s">
-                                <span class="text-3xl mb-2">${players[2].avatar}</span>
-                                <div class="w-16 bg-orange-700 h-14 rounded-t-lg flex items-start justify-center pt-2 font-bold">${players[2].score}</div>
-                            </div>
-                        ` : ''}
-                    </div>
-
-                    <div class="glass-panel p-4 rounded-xl w-full mb-6 flex justify-around">
-                        <div class="text-center">
-                            <div class="text-xs text-gray-400">مكافأة العملات</div>
-                            <div class="font-bold text-yellow-400">+${amIWinner ? 50 : 10} 🪙</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-xs text-gray-400">مكافأة الخبرة</div>
-                            <div class="font-bold text-primary">+${amIWinner ? 100 : 25} ✨</div>
+                    <div class="glass-panel p-6 rounded-2xl w-full mb-6">
+                        <h3 class="font-bold mb-4 text-primary">لوحة الشرف</h3>
+                        <div class="flex flex-col gap-2">
+                            ${players.map((p, idx) => `
+                                <div class="flex justify-between items-center bg-black/30 p-3 rounded-xl">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
+                                        <span>${p.avatar}${p.name}</span>
+                                    </div>
+                                    <span class="font-bold text-secondary">${p.score} نقطة</span>
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
-
-                    ${State.room.host === State.user.uid 
-                        ? `<button data-action="return-lobby" class="btn-primary w-full py-4 rounded-xl font-bold text-lg mb-2">العودة للوبي</button>`
-                        : `<div class="text-gray-400 mt-4 animate-pulse">في انتظار المضيف للعودة للوبي...</div>`
-                    }
+                    <button data-action="return-lobby" class="btn-primary w-full py-4 rounded-xl font-bold text-lg cursor-pointer">العودة للوبي</button>
                 </div>
             `;
         }
 
+        // Sound System
         const AudioSys = {
             ctx: null,
             init() {
@@ -519,28 +436,24 @@
                 if(this.ctx.state === 'suspended') this.ctx.resume();
             },
             playTone(freq, type, dur, vol=0.1) {
-                if(!State.audioEnabled) return;
-                this.init();
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.00001, this.ctx.currentTime + dur);
-                osc.stop(this.ctx.currentTime + dur);
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.00001, this.ctx.currentTime + dur);
+                    osc.stop(this.ctx.currentTime + dur);
+                } catch(e) {}
             },
             beep() { this.playTone(600, 'sine', 0.1); },
             click() { this.playTone(800, 'triangle', 0.05, 0.05); },
-            success() { 
-                this.playTone(800, 'square', 0.1); 
-                setTimeout(()=>this.playTone(1200, 'square', 0.2), 100); 
-            },
-            fail() {
-                this.playTone(300, 'sawtooth', 0.3);
-            }
+            success() { this.playTone(800, 'square', 0.1); setTimeout(()=>this.playTone(1200, 'square', 0.2), 100); },
+            fail() { this.playTone(300, 'sawtooth', 0.3); }
         };
 
         function showToast(msg) {
@@ -555,475 +468,240 @@
             }, 3000);
         }
 
-        async function initApp() {
-            try {
-                if (AUTH_TOKEN) {
-                    await signInWithCustomToken(auth, AUTH_TOKEN);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                auth.onAuthStateChanged(async (user) => {
-                    if (user) {
-                        await loadProfile(user.uid);
-                    } else {
-                        State.view = 'loading';
-                        render();
-                    }
-                });
-            } catch (error) {
-                console.error("Auth Error", error);
-                showToast("خطأ في تسجيل الدخول. تأكد من الاتصال.");
-            }
-        }
+        // Action Handlers & Simulation Router
+        function attachEventListeners() {
+            document.querySelectorAll('[data-action]').forEach(el => {
+                el.onclick = (e) => {
+                    AudioSys.click();
+                    const action = el.getAttribute('data-action');
+                    const val = el.getAttribute('data-val');
 
-        async function loadProfile(uid) {
-            const profileRef = doc(db, 'artifacts', APP_ID, 'users', uid);
-            try {
-                const docSnap = await getDoc(profileRef);
-                if (docSnap.exists()) {
-                    State.user = { uid, ...docSnap.data() };
-                    State.view = 'menu';
-                } else {
-                    State.user = { uid, name: '', avatar: '🦊', coins: 0, xp: 0, level: 1 };
-                    State.view = 'login';
-                }
-                render();
-            } catch (err) {
-                console.error(err);
-                showToast("خطأ في جلب البيانات.");
-            }
-        }
-
-        async function saveProfile() {
-            if(!State.user || !State.user.uid) return;
-            const profileRef = doc(db, 'artifacts', APP_ID, 'users', State.user.uid);
-            await setDoc(profileRef, {
-                name: State.user.name,
-                avatar: State.user.avatar,
-                coins: State.user.coins,
-                xp: State.user.xp,
-                level: State.user.level
-            }, {merge: true});
-        }
-
-        function generateRoomCode() {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            let result = '';
-            for (let i = 0; i < 5; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-            return result;
-        }
-
-        async function createRoom() {
-            const code = generateRoomCode();
-            const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', code);
-            
-            const roomData = {
-                id: code,
-                host: State.user.uid,
-                status: 'lobby',
-                players: {
-                    [State.user.uid]: {
-                        uid: State.user.uid, name: State.user.name, avatar: State.user.avatar, isReady: true, score: 0, micOn: false
-                    }
-                },
-                chat: []
-            };
-
-            await setDoc(roomRef, roomData);
-            joinRoomLogic(code);
-        }
-
-        async function joinRoomFromInput(code) {
-            if(!code || code.length !== 5) {
-                showToast("رمز الغرفة غير صحيح");
-                return;
-            }
-            code = code.toUpperCase();
-            const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', code);
-            const snap = await getDoc(roomRef);
-            
-            if(!snap.exists()) {
-                showToast("الغرفة غير موجودة");
-                return;
-            }
-            if(snap.data().status !== 'lobby') {
-                showToast("اللعبة بدأت بالفعل!");
-                return;
-            }
-            if(Object.keys(snap.data().players || {}).length >= 8) {
-                showToast("الغرفة ممتلئة!");
-                return;
-            }
-
-            await updateDoc(roomRef, {
-                [`players.${State.user.uid}`]: {
-                    uid: State.user.uid, name: State.user.name, avatar: State.user.avatar, isReady: false, score: 0, micOn: false
-                }
-            });
-            joinRoomLogic(code);
-        }
-
-        function joinRoomLogic(code) {
-            State.roomId = code;
-            const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', code);
-            
-            State.unsubscribeRoom = onSnapshot(roomRef, (docSnap) => {
-                if(!docSnap.exists()) {
-                    handleKickedOrClosed();
-                    return;
-                }
-                const data = docSnap.data();
-                const prevStatus = State.room?.status;
-                State.room = data;
-                
-                // If I was removed
-                if(!data.players[State.user.uid]) {
-                    handleKickedOrClosed();
-                    return;
-                }
-
-                // Handle status transitions
-                if(data.status === 'countdown' && prevStatus === 'lobby') {
-                    State.view = 'game';
-                    startCountdownSequence();
-                } else if(data.status === 'playing' && prevStatus === 'countdown') {
-                    // Game already rendering, just update loop
-                    AudioSys.beep();
-                } else if (data.status === 'results' && prevStatus === 'playing') {
-                    State.view = 'results';
-                    AudioSys.playTone(500, 'square', 0.5); // End sound
-                    awardPostGame();
-                } else if (data.status === 'lobby' && prevStatus === 'results') {
-                    State.view = 'lobby';
-                }
-
-                if(['lobby', 'results'].includes(State.view) || (State.view === 'game' && ['countdown', 'playing'].includes(data.status))) {
-                    render();
-                }
-                
-                // Update chat scroll if in lobby
-                if(State.view === 'lobby') {
-                    setTimeout(()=>{
-                        const chatBox = document.getElementById('chat-messages');
-                        if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-                    }, 50);
-                }
-            }, (error) => {
-                console.error("Room Sync Error", error);
-                showToast("فقدت الاتصال بالغرفة");
-                handleKickedOrClosed();
-            });
-
-            State.view = 'lobby';
-            render();
-        }
-
-        function handleKickedOrClosed() {
-            if(State.unsubscribeRoom) State.unsubscribeRoom();
-            State.roomId = null;
-            State.room = null;
-            State.view = 'menu';
-            render();
-            showToast("تم إغلاق الغرفة أو مغادرتها.");
-        }
-
-        async function leaveRoom() {
-            if(!State.roomId) return;
-            const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', State.roomId);
-            try {
-                // If host, delete room or transfer. For simplicity, if host leaves, we could just delete or let it orphan.
-                // Firebase rules allow deleting if host. We'll just remove player.
-                await updateDoc(roomRef, {
-                    [`players.${State.user.uid}`]: deleteField()
-                });
-            } catch(e) {}
-            handleKickedOrClosed();
-        }
-
-        async function startGameAsHost() {
-            if(State.room.host !== State.user.uid) return;
-            
-            const minigame = MINIGAMES[Math.floor(Math.random() * MINIGAMES.length)];
-            const gd = generateGameData(minigame.id);
-            
-            const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', State.roomId);
-            
-            // Reset scores
-            const updates = { status: 'countdown', gameData: gd };
-            Object.keys(State.room.players).forEach(uid => {
-                if (State.room.players[uid]) {
-                    updates[`players.${uid}.score`] = 0;
-                }
-            });
-            
-            await updateDoc(roomRef, updates);
-        }
-
-        function generateGameData(type) {
-            const data = { type, endTime: 0, currentQIndex: 0, questions: [] };
-            // Generate pool of 50 questions
-            if (type === 'quick_math') {
-                for(let i=0; i<50; i++) {
-                    let op = Math.random() > 0.5 ? '+' : '-';
-                    let a = Math.floor(Math.random() * 20) + 1;
-                    let b = Math.floor(Math.random() * 20) + 1;
-                    if(op === '-' && a < b) [a, b] = [b, a]; // positive results
-                    let ans = op === '+' ? a+b : a-b;
-                    let opts = new Set([ans]);
-                    while(opts.size < 4) opts.add(ans + Math.floor(Math.random()*10 - 5));
-                    data.questions.push({ q: `${a} ${op} ${b}`, options: Array.from(opts).sort(()=>Math.random()-0.5), answer: ans });
-                }
-            } else if (type === 'color_match') {
-                const colors = ['red', 'blue', 'green', 'yellow'];
-                for(let i=0; i<50; i++) {
-                    let wordColor = colors[Math.floor(Math.random()*colors.length)];
-                    let visualColor = colors[Math.floor(Math.random()*colors.length)];
-                    let opts = new Set([wordColor]);
-                    while(opts.size < 4) opts.add(colors[Math.floor(Math.random()*colors.length)]);
-                    data.questions.push({ wordColor, visualColor, options: Array.from(opts).sort(()=>Math.random()-0.5), answer: wordColor });
-                }
-            }
-            return data;
-        }
-
-        function startCountdownSequence() {
-            let count = 3;
-            AudioSys.beep();
-            
-            const timer = setInterval(() => {
-                count--;
-                const el = document.getElementById('countdown-text');
-                if(el) {
-                    el.innerText = count > 0 ? count : 'انطلق!';
-                    el.classList.add('scale-150');
-                    setTimeout(()=>el.classList.remove('scale-150'), 200);
-                }
-                
-                if(count > 0) {
-                    AudioSys.beep();
-                } else {
-                    clearInterval(timer);
-                    if(State.room.host === State.user.uid) {
-                        // Host transitions state to playing and sets end time (60s from now)
-                        const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', State.roomId);
-                        updateDoc(roomRef, { 
-                            status: 'playing',
-                            'gameData.endTime': Date.now() + 60000 
+                    if (action === 'select-avatar') {
+                        document.querySelectorAll('.avatar-btn').forEach(b => {
+                            b.classList.remove('border-primary', 'bg-primary/20');
+                            b.classList.add('border-transparent', 'bg-white/5');
                         });
+                        el.classList.remove('border-transparent', 'bg-white/5');
+                        el.classList.add('border-primary', 'bg-primary/25');
+                        State.selectedAvatar = val;
+                    } else if (action === 'create-profile') {
+                        const nameInput = document.getElementById('username-input').value.trim();
+                        const name = nameInput || `لاعب ${Math.floor(Math.random()*900+100)}`;
+                        const avatar = State.selectedAvatar || '🦊';
+                        State.user = { uid: 'user_' + Math.random().toString(36).substring(2, 9), name, avatar, coins: 100, xp: 0, level: 1 };
+                        State.view = 'menu';
+                        render();
+                        showToast(`مرحباً بك يا ${name}!`);
+                    } else if (action === 'go-shop') {
+                        State.view = 'shop';
+                        render();
+                    } else if (action === 'go-menu') {
+                        State.view = 'menu';
+                        render();
+                    } else if (action === 'go-ads') {
+                        State.view = 'ads';
+                        render();
+                    } else if (action === 'buy-vip') {
+                        showToast('تم تفعيل ميزة إزالة الإعلانات بنجاح! 👑');
+                    } else if (action === 'watch-ad') {
+                        State.user.coins += 50;
+                        showToast('حصلت على 50 عملة بنجاح! 🪙');
+                        State.view = 'menu';
+                        render();
+                    } else if (action === 'buy-avatar') {
+                        State.user.avatar = val;
+                        showToast('تم تغيير الصورة الرمزية!');
+                        render();
+                    } else if (action === 'create-room') {
+                        const code = Math.random().toString(36).substring(2, 7).toUpperCase();
+                        State.roomId = code;
+                        State.room = {
+                            host: State.user.uid,
+                            status: 'lobby',
+                            players: {
+                                [State.user.uid]: { uid: State.user.uid, name: State.user.name, avatar: State.user.avatar, isReady: true, score: 0, micOn: false }
+                            },
+                            chat: [{ name: 'النظام', text: `تم إنشاء الغرفة برمز ${code}` }]
+                        };
+                        State.view = 'lobby';
+                        render();
+                        showToast('تم إنشاء الغرفة بنجاح!');
+                    } else if (action === 'join-room') {
+                        const code = document.getElementById('room-code-input').value.trim().toUpperCase();
+                        if(!code || code.length < 3) {
+                            showToast('الرجاء إدخال رمز غرفة صحيح');
+                            return;
+                        }
+                        State.roomId = code;
+                        // Create simulated room with bots for instant play
+                        State.room = {
+                            host: 'bot_host',
+                            status: 'lobby',
+                            players: {
+                                'bot_host': { uid: 'bot_host', name: 'أحمد 🤖', avatar: '🤖', isReady: true, score: 0, micOn: true },
+                                [State.user.uid]: { uid: State.user.uid, name: State.user.name, avatar: State.user.avatar, isReady: false, score: 0, micOn: false }
+                            },
+                            chat: [{ name: 'النظام', text: `انضممت للغرفة ${code} بنجاح` }]
+                        };
+                        State.view = 'lobby';
+                        render();
+                        showToast('تم الانضمام للغرفة بنجاح!');
+                    } else if (action === 'leave-room') {
+                        State.room = null;
+                        State.roomId = null;
+                        State.view = 'menu';
+                        render();
+                        showToast('تمت مغادرة الغرفة');
+                    } else if (action === 'toggle-mic') {
+                        State.myMicOn = !State.myMicOn;
+                        if(State.room?.players?.[State.user.uid]) {
+                            State.room.players[State.user.uid].micOn = State.myMicOn;
+                        }
+                        render();
+                        showToast(State.myMicOn ? 'تم فتح الميكروفون 🎤' : 'تم كتم الصوت 🔇');
+                    } else if (action === 'toggle-ready') {
+                        const p = State.room.players[State.user.uid];
+                        p.isReady = !p.isReady;
+                        render();
+                    } else if (action === 'send-chat') {
+                        const input = document.getElementById('chat-input');
+                        const text = input.value.trim();
+                        if(text) {
+                            State.room.chat.push({ name: State.user.name, text });
+                            input.value = '';
+                            render();
+                            const chatContainer = document.getElementById('chat-messages');
+                            if(chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    } else if (action === 'start-game') {
+                        startMiniGame();
+                    } else if (action === 'return-lobby') {
+                        State.room.status = 'lobby';
+                        Object.values(State.room.players).forEach(p => { p.score = 0; p.isReady = false; });
+                        State.view = 'lobby';
+                        render();
+                    } else if (action === 'tap-target') {
+                        AudioSys.success();
+                        State.room.players[State.user.uid].score += 10;
+                        State.gameLocalState.targetPos = {
+                            x: Math.floor(Math.random() * 80 + 10),
+                            y: Math.floor(Math.random() * 80 + 10)
+                        };
+                        render();
+                    } else if (action === 'answer-math') {
+                        const valNum = parseInt(val);
+                        const currentQ = State.room.gameData.questions[State.room.gameData.currentQIndex];
+                        if (valNum === currentQ.ans) {
+                            AudioSys.success();
+                            State.room.players[State.user.uid].score += 25;
+                            showToast('إجابة صحيحة! +25');
+                        } else {
+                            AudioSys.fail();
+                            showToast('إجابة خاطئة!');
+                        }
+                        State.room.gameData.currentQIndex++;
+                        if (State.room.gameData.currentQIndex >= State.room.gameData.questions.length) {
+                            endGame();
+                        } else {
+                            render();
+                        }
+                    } else if (action === 'answer-color') {
+                        const currentQ = State.room.gameData.questions[State.room.gameData.currentQIndex];
+                        if (val === currentQ.wordColor) {
+                            AudioSys.success();
+                            State.room.players[State.user.uid].score += 25;
+                            showToast('إجابة صحيحة! +25');
+                        } else {
+                            AudioSys.fail();
+                            showToast('إجابة خاطئة!');
+                        }
+                        State.room.gameData.currentQIndex++;
+                        if (State.room.gameData.currentQIndex >= State.room.gameData.questions.length) {
+                            endGame();
+                        } else {
+                            render();
+                        }
                     }
-                    startGameLoopLocal();
+                };
+            });
+        }
+
+        function startMiniGame() {
+            const randomGame = MINIGAMES[Math.floor(Math.random() * MINIGAMES.length)];
+            
+            // Generate questions if math or color
+            let questions = [];
+            if (randomGame.id === 'quick_math') {
+                for(let i=0; i<5; i++) {
+                    const a = Math.floor(Math.random() * 20 + 1);
+                    const b = Math.floor(Math.random() * 20 + 1);
+                    const ans = a + b;
+                    let options = [ans, ans + 2, ans - 3, ans + 4].sort(() => Math.random() - 0.5);
+                    questions.push({ q: `${a} + ${b}`, ans, options });
+                }
+            } else if (randomGame.id === 'color_match') {
+                const colors = ['red', 'blue', 'green', 'yellow'];
+                for(let i=0; i<5; i++) {
+                    const wordColor = colors[Math.floor(Math.random() * colors.length)];
+                    const visualColor = colors[Math.floor(Math.random() * colors.length)];
+                    questions.push({ wordColor, visualColor, options: colors });
+                }
+            }
+
+            State.room.status = 'countdown';
+            State.room.gameData = { type: randomGame.id, questions, currentQIndex: 0 };
+            render();
+
+            let count = 3;
+            const cdInterval = setInterval(() => {
+                count--;
+                const numEl = document.getElementById('countdown-num');
+                if(numEl) numEl.innerText = count;
+                if(count <= 0) {
+                    clearInterval(cdInterval);
+                    State.room.status = 'playing';
+                    State.gameLocalState.timeLeft = 30;
+                    render();
+                    
+                    // Main Timer loop
+                    if(State.gameInterval) clearInterval(State.gameInterval);
+                    State.gameInterval = setInterval(() => {
+                        State.gameLocalState.timeLeft--;
+                        const timerEl = document.querySelector('.timer-display');
+                        if(timerEl) timerEl.innerText = State.gameLocalState.timeLeft + 's';
+                        
+                        // Simulate bots scoring
+                        if(Math.random() > 0.6) {
+                            Object.values(State.room.players).forEach(p => {
+                                if(p.uid !== State.user.uid) p.score += Math.floor(Math.random() * 5);
+                            });
+                        }
+
+                        if(State.gameLocalState.timeLeft <= 0) {
+                            clearInterval(State.gameInterval);
+                            endGame();
+                        }
+                    }, 1000);
                 }
             }, 1000);
         }
 
-        function startGameLoopLocal() {
-            if(State.gameLocalState.timer) clearInterval(State.gameLocalState.timer);
-            
-            // Randomly position first tap target
-            State.gameLocalState.targetPos = { x: 20 + Math.random()*60, y: 20 + Math.random()*60 };
+        function endGame() {
+            if(State.gameInterval) clearInterval(State.gameInterval);
+            State.room.status = 'results';
+            State.user.coins += 20;
+            State.user.xp += 50;
+            if(State.user.xp >= 100) { State.user.level++; State.user.xp = 0; }
+            State.view = 'results';
             render();
-
-            State.gameLocalState.timer = setInterval(() => {
-                if(State.room?.status !== 'playing') return;
-                
-                const endTime = State.room.gameData.endTime;
-                if(!endTime) return;
-                
-                const left = Math.max(0, endTime - Date.now());
-                const secs = Math.ceil(left / 1000);
-                
-                const displays = document.querySelectorAll('.timer-display');
-                displays.forEach(d => {
-                    d.innerText = `00:${secs.toString().padStart(2, '0')}`;
-                    if(secs <= 10) d.classList.add('text-red-500', 'animate-pulse');
-                });
-
-                if(left <= 0) {
-                    clearInterval(State.gameLocalState.timer);
-                    if(State.room.host === State.user.uid) {
-                        const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', State.roomId);
-                        updateDoc(roomRef, { status: 'results' });
-                    }
-                }
-            }, 250);
+            AudioSys.success();
         }
 
-        async function handleAction(action, val, el) {
-            AudioSys.click();
-
-            if (action === 'select-avatar') {
-                document.querySelectorAll('.avatar-btn').forEach(b => {
-                    b.classList.remove('border-primary', 'bg-primary/20');
-                    b.classList.add('border-transparent', 'bg-white/5');
-                });
-                el.classList.remove('border-transparent', 'bg-white/5');
-                el.classList.add('border-primary', 'bg-primary/20');
-                el.dataset.selected = "true";
-            }
-            else if (action === 'create-profile') {
-                let name = document.getElementById('username-input').value.trim();
-                if(!name) return showToast("يرجى إدخال اسم");
-                let avatar = document.querySelector('.avatar-btn[data-selected="true"]')?.dataset.val || AVATARS[0];
-                State.user.name = name;
-                State.user.avatar = avatar;
-                await saveProfile();
-                State.view = 'menu';
-                render();
-            }
-            else if (action === 'go-shop') { State.view = 'shop'; render(); }
-            else if (action === 'go-menu') { State.view = 'menu'; render(); }
-            else if (action === 'go-ads') { State.view = 'ads'; render(); }
-            else if (action === 'watch-ad') {
-                const btn = document.getElementById('btn-watch-ad');
-                btn.disabled = true;
-                btn.innerText = 'جاري مشاهدة الإعلان...';
-                setTimeout(async () => {
-                    State.user.coins += 50;
-                    await saveProfile();
-                    showToast("حصلت على 50 عملة ذهبية!");
-                    State.view = 'menu';
-                    render();
-                }, 3000);
-            }
-            else if (action === 'buy-vip') {
-                showToast("هذه ميزة تجريبية غير متوفرة حالياً.");
-            }
-            else if (action === 'create-room') {
-                await createRoom();
-            }
-            else if (action === 'join-room') {
-                const code = document.getElementById('room-code-input').value;
-                await joinRoomFromInput(code);
-            }
-            else if (action === 'leave-room') {
-                await leaveRoom();
-            }
-            else if (action === 'toggle-ready') {
-                if(!State.roomId) return;
-                const isReady = !State.room.players[State.user.uid].isReady;
-                const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', State.roomId);
-                await updateDoc(roomRef, { [`players.${State.user.uid}.isReady`]: isReady });
-            }
-            else if (action === 'toggle-mic') {
-                State.myMicOn = !State.myMicOn;
-                if(State.roomId) {
-                    const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', State.roomId);
-                    updateDoc(roomRef, { [`players.${State.user.uid}.micOn`]: State.myMicOn });
-                }
-                render();
-            }
-            else if (action === 'send-chat') {
-                const inp = document.getElementById('chat-input');
-                const txt = inp.value.trim();
-                if(!txt || !State.roomId) return;
-                inp.value = '';
-                const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', State.roomId);
-                await updateDoc(roomRef, {
-                    chat: arrayUnion({ sender: State.user.uid, name: State.user.name, text: txt, time: Date.now() })
-                });
-            }
-            else if (action === 'start-game') {
-                await startGameAsHost();
-            }
-            else if (action === 'return-lobby') {
-                if(State.room.host !== State.user.uid) return;
-                const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', State.roomId);
-                const updates = { status: 'lobby' };
-                // reset ready status except host
-                Object.keys(State.room.players).forEach(uid => {
-                    if (State.room.players[uid]) {
-                        updates[`players.${uid}.isReady`] = uid === State.user.uid;
-                    }
-                });
-                await updateDoc(roomRef, updates);
-            }
-            
-            // In-Game Actions
-            if (State.room?.status === 'playing') {
-                const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', State.roomId);
-                
-                if (action === 'tap-target') {
-                    AudioSys.success();
-                    // Move target immediately locally for responsiveness
-                    State.gameLocalState.targetPos = { x: 10 + Math.random()*80, y: 10 + Math.random()*80 };
-                    render();
-                    await updateDoc(roomRef, { [`players.${State.user.uid}.score`]: increment(1) });
-                }
-                else if (action === 'answer-math') {
-                    const q = State.room.gameData.questions[State.room.gameData.currentQIndex];
-                    if(parseInt(val) === q.answer) {
-                        AudioSys.success();
-                        await updateDoc(roomRef, { 
-                            [`players.${State.user.uid}.score`]: increment(5),
-                            'gameData.currentQIndex': increment(1)
-                        });
-                    } else {
-                        AudioSys.fail();
-                        el.classList.add('bg-red-500');
-                        setTimeout(() => el.classList.remove('bg-red-500'), 200);
-                    }
-                }
-                else if (action === 'answer-color') {
-                    const q = State.room.gameData.questions[State.room.gameData.currentQIndex];
-                    if(val === q.answer) {
-                        AudioSys.success();
-                        await updateDoc(roomRef, { 
-                            [`players.${State.user.uid}.score`]: increment(5),
-                            'gameData.currentQIndex': increment(1)
-                        });
-                    } else {
-                        AudioSys.fail();
-                        el.classList.add('border-red-500', 'border-4');
-                        setTimeout(() => el.classList.remove('border-red-500', 'border-4'), 200);
-                    }
-                }
-            }
-        }
-
-        // Calculate and save XP/Coins after match (Run locally for self to avoid FB triggers)
-        let awardedRoundId = null;
-        async function awardPostGame() {
-            if(!State.room || State.room.status !== 'results') return;
-            if(awardedRoundId === State.room.gameData.endTime) return; // prevent double award
-            awardedRoundId = State.room.gameData.endTime;
-
-            const players = Object.values(State.room.players || {}).filter(Boolean).sort((a,b) => (b.score || 0) - (a.score || 0));
-            const amIWinner = players[0]?.uid === State.user.uid;
-            
-            State.user.coins += amIWinner ? 50 : 10;
-            State.user.xp += amIWinner ? 100 : 25;
-            
-            // Level up check
-            let xpNeeded = State.user.level * 200;
-            if(State.user.xp >= xpNeeded) {
-                State.user.level++;
-                State.user.xp -= xpNeeded;
-                showToast(`🎉 مبروك! وصلت للمستوى ${State.user.level}`);
-            }
-            
-            await saveProfile();
-        }
-
-        document.body.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-action]');
-            if(btn) {
-                const action = btn.dataset.action;
-                const val = btn.dataset.val;
-                handleAction(action, val, btn);
-            }
-        });
-
-        // Chat Enter Key
-        document.body.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter' && e.target.id === 'chat-input') {
-                handleAction('send-chat');
-            }
-        });
-
-        // Boot
-        window.onload = initApp;
-
+        // Initialize App
+        window.onload = () => {
+            State.view = 'login';
+            render();
+        };
     </script>
 </body>
 </html>
